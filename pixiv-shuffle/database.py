@@ -13,6 +13,7 @@ def get_conn() -> sqlite3.Connection:
 
 
 def init_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with get_conn() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS authors (
