@@ -105,8 +105,15 @@ async def api_stats() -> dict[str, int]:
 async def api_fetch_trigger(background_tasks: BackgroundTasks) -> dict[str, str]:
     if not config.PIXIV_REFRESH_TOKEN:
         raise HTTPException(status_code=503, detail="PIXIV_REFRESH_TOKEN is not configured.")
+    if scheduler.get_progress()["running"]:
+        return {"status": "already_running"}
     background_tasks.add_task(_run_batch_safe)
     return {"status": "started"}
+
+
+@app.get("/api/fetch/status")
+async def api_fetch_status() -> dict:
+    return scheduler.get_progress()
 
 
 async def _run_batch_safe():

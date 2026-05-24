@@ -200,10 +200,43 @@
       cursor: pointer;
     }
     #trigger-fetch-btn:hover { background: var(--accent-hover); }
+
+    /* Batch progress banner */
+    #batch-banner {
+      display: none;
+      background: #1a2a1a;
+      border-bottom: 1px solid #2e4d2e;
+      padding: 8px 16px;
+      font-size: 0.82rem;
+      color: #7ecb7e;
+      gap: 8px;
+      align-items: center;
+    }
+    #batch-banner.visible { display: flex; }
+    #batch-progress-bar-wrap {
+      flex: 1;
+      height: 4px;
+      background: #2e4d2e;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #batch-progress-bar {
+      height: 100%;
+      background: #4caf7d;
+      transition: width 0.4s;
+      border-radius: 2px;
+    }
   </style>
 </head>
 <body>
 <div id="app">
+
+  <div id="batch-banner">
+    <span id="batch-status-text">取得中...</span>
+    <div id="batch-progress-bar-wrap">
+      <div id="batch-progress-bar" style="width:0%"></div>
+    </div>
+  </div>
 
   <div id="header">
     <a id="author-link" href="#" target="_blank" rel="noopener">読み込み中...</a>
@@ -352,7 +385,7 @@
         const d = await res.json();
         alert('エラー: ' + (d.detail || res.status));
       } else {
-        alert('バッチを開始しました。数分後に作品が取得されます。');
+        pollBatchStatus();
       }
     } catch (e) {
       alert('通信エラー: ' + e.message);
@@ -368,9 +401,47 @@
     document.getElementById('header').style.display = show ? 'none' : '';
   }
 
+  // ---------- Batch progress polling ----------
+  let batchPollTimer = null;
+
+  async function pollBatchStatus() {
+    try {
+      const res = await fetch('/api/fetch/status');
+      if (!res.ok) return;
+      const s = await res.json();
+      const banner = document.getElementById('batch-banner');
+
+      if (s.running) {
+        banner.classList.add('visible');
+        let text = '取得中...';
+        if (s.phase === 'following') {
+          text = 'フォロー中ユーザーを取得中...';
+        } else if (s.phase === 'works' && s.total > 0) {
+          const pct = Math.round((s.done / s.total) * 100);
+          text = `作品取得中: ${s.done}/${s.total} 人完了 (+${s.new_works}件)`;
+          if (s.current_author) text += ` — ${s.current_author}`;
+          document.getElementById('batch-progress-bar').style.width = pct + '%';
+        }
+        document.getElementById('batch-status-text').textContent = text;
+        batchPollTimer = setTimeout(pollBatchStatus, 2000);
+      } else {
+        banner.classList.remove('visible');
+        document.getElementById('batch-progress-bar').style.width = '0%';
+        if (batchPollTimer) {
+          clearTimeout(batchPollTimer);
+          batchPollTimer = null;
+          // Batch just finished — refresh stats and reload work
+          refreshStats();
+          if (!currentWork) fetchNext();
+        }
+      }
+    } catch {}
+  }
+
   // Init
   fetchNext();
   refreshStats();
+  pollBatchStatus();
 </script>
 </body>
 </html>
