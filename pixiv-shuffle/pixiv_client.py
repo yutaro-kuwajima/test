@@ -1,5 +1,6 @@
 import time
 import logging
+import urllib.parse
 from pixivpy3 import AppPixivAPI
 
 logger = logging.getLogger(__name__)
@@ -30,22 +31,24 @@ def fetch_all_following(user_id: str | None = None) -> list[dict]:
     if user_id is None:
         user_id = str(api.user_id)
     results = []
-    next_url = None
+    offset = 0
 
-    # user_id="0" means self
-    resp = api.user_following(user_id, restrict="public")
     while True:
+        resp = api.user_following(user_id, restrict="public", offset=offset)
         if "error" in resp:
             logger.error("Error fetching following: %s", resp["error"])
             break
-        for user_preview in resp.get("user_previews", []):
+        previews = resp.get("user_previews", [])
+        for user_preview in previews:
             u = user_preview["user"]
             results.append({"id": str(u["id"]), "name": u["name"]})
         next_url = resp.get("next_url")
         if not next_url:
             break
+        # parse offset from next_url
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(next_url).query)
+        offset = int(qs.get("offset", [offset + 30])[0])
         time.sleep(1)
-        resp = api.no_auth_requests_handler(next_url)
 
     logger.info("Fetched %d followed users.", len(results))
     return results
@@ -72,10 +75,11 @@ def fetch_user_illusts(user_id: str, max_works: int = 100) -> list[dict]:
         for illust in illusts:
             results.append(_parse_illust(illust))
 
-        if not resp.get("next_url"):
+        next_url = resp.get("next_url")
+        if not next_url:
             break
-
-        offset += len(illusts)
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(next_url).query)
+        offset = int(qs.get("offset", [offset + len(illusts)])[0])
         time.sleep(1)
 
     return results[:max_works]
