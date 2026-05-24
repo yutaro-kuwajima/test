@@ -4,9 +4,13 @@
 
 ## セットアップ
 
+> **パスについて**: 以降のコマンドはプロジェクトを `C:\pixiv-shuffle` に置いた前提で記載しています。  
+> 別の場所に置く場合は `C:\pixiv-shuffle` をそのパスに読み替えてください。
+
 ### 1. 依存パッケージのインストール
 
 ```bash
+cd C:\pixiv-shuffle
 pip install -r requirements.txt
 ```
 
@@ -33,7 +37,8 @@ gppt login
 ### 3. 環境変数の設定
 
 ```bash
-cp .env.example .env
+cd C:\pixiv-shuffle
+copy .env.example .env
 # .env を編集して PIXIV_REFRESH_TOKEN を設定
 ```
 
@@ -44,6 +49,7 @@ PIXIV_REFRESH_TOKEN=取得したトークンをここに貼り付け
 ### 4. 起動
 
 ```bash
+cd C:\pixiv-shuffle
 uvicorn main:app --host 0.0.0.0 --port 8765
 ```
 
@@ -73,7 +79,7 @@ http://100.x.x.x:8765
 3. 操作: プログラムの開始
    - プログラム: `pythonw.exe` のフルパス（例: `C:\Python311\pythonw.exe`）
    - 引数: `-m uvicorn main:app --host 0.0.0.0 --port 8765`
-   - 開始場所: `C:\path\to\pixiv-shuffle`
+   - 開始場所: `C:\pixiv-shuffle`
 
 ### 方法B: バッチファイル + ショートカット
 
@@ -81,7 +87,7 @@ http://100.x.x.x:8765
 
 ```bat
 @echo off
-cd /d C:\path\to\pixiv-shuffle
+cd /d C:\pixiv-shuffle
 start /B pythonw -m uvicorn main:app --host 0.0.0.0 --port 8765
 ```
 
