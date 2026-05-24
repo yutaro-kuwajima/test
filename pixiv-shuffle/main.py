@@ -29,7 +29,11 @@ async def lifespan(app: FastAPI):
     if not config.PIXIV_REFRESH_TOKEN:
         logger.warning("PIXIV_REFRESH_TOKEN is not set. Pixiv features will be unavailable.")
     else:
-        pixiv_client.init_api(config.PIXIV_REFRESH_TOKEN)
+        try:
+            pixiv_client.init_api(config.PIXIV_REFRESH_TOKEN)
+        except Exception as e:
+            logger.error("Pixiv auth failed: %s", e)
+            logger.warning("Server will start without Pixiv API. Fix PIXIV_REFRESH_TOKEN and restart.")
 
     from apscheduler.schedulers.background import BackgroundScheduler
     sched = BackgroundScheduler()
