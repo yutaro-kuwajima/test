@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Pixiv Shuffle Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface2: #2a2a2a;
+      --border: #333;
+      --text: #e0e0e0;
+      --text-sub: #9e9e9e;
+      --accent: #7c9df7;
+      --accent-hover: #a0b8ff;
+      --seen-btn: #4caf7d;
+      --seen-hover: #5dc98d;
+      --skip-btn: #616161;
+      --skip-hover: #757575;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 480px;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    #header {
+      padding: 12px 16px 8px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #author-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: 600;
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #author-link:hover { color: var(--accent-hover); }
+
+    #date-text {
+      color: var(--text-sub);
+      font-size: 0.8rem;
+      margin-top: 2px;
+    }
+
+    /* Image area */
+    #image-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      background: var(--bg);
+    }
+
+    #work-link {
+      display: block;
+      width: 100%;
+    }
+
+    #work-img {
+      width: 100%;
+      border-radius: 8px;
+      display: block;
+      object-fit: contain;
+      max-height: 65dvh;
+      background: var(--surface2);
+    }
+
+    #work-title {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      text-align: center;
+      word-break: break-all;
+    }
+
+    /* Skeleton / loading */
+    .skeleton {
+      animation: pulse 1.4s ease-in-out infinite;
+      background: var(--surface2);
+      border-radius: 8px;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Buttons */
+    #controls {
+      padding: 12px 16px;
+      display: flex;
+      gap: 10px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.08s;
+    }
+    .btn:active { transform: scale(0.97); }
+
+    #btn-skip {
+      background: var(--skip-btn);
+      color: #fff;
+    }
+    #btn-skip:hover { background: var(--skip-hover); }
+
+    #btn-seen {
+      background: var(--seen-btn);
+      color: #fff;
+    }
+    #btn-seen:hover { background: var(--seen-hover); }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Stats */
+    #stats {
+      padding: 10px 16px 14px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--text-sub);
+    }
+
+    #stats span { line-height: 1.6; }
+
+    #fetch-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #fetch-btn:hover { background: rgba(124, 157, 247, 0.15); }
+
+    /* Empty / error state */
+    #message {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+      text-align: center;
+      color: var(--text-sub);
+    }
+    #message.visible { display: flex; }
+    #message .msg-icon { font-size: 2.5rem; }
+    #message .msg-text { font-size: 0.95rem; line-height: 1.6; }
+
+    #trigger-fetch-btn {
+      padding: 12px 24px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #trigger-fetch-btn:hover { background: var(--accent-hover); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <a id="author-link" href="#" target="_blank" rel="noopener">読み込み中...</a>
+    <div id="date-text">--</div>
+  </div>
+
+  <div id="image-wrap">
+    <a id="work-link" href="#" target="_blank" rel="noopener">
+      <img id="work-img" src="" alt="作品画像" class="skeleton" style="min-height:200px;">
+    </a>
+    <div id="work-title"></div>
+  </div>
+
+  <div id="message">
+    <div class="msg-icon">📭</div>
+    <div class="msg-text">作品がまだありません。<br>バッチを実行してPixivから作品を取得してください。</div>
+    <button id="trigger-fetch-btn" onclick="triggerFetch()">バッチを今すぐ実行</button>
+  </div>
+
+  <div id="controls">
+    <button class="btn" id="btn-skip" onclick="onSkip()" disabled>スキップ</button>
+    <button class="btn" id="btn-seen" onclick="onSeen()" disabled>見た！</button>
+  </div>
+
+  <div id="stats">
+    <span>
+      未表示: <strong id="stat-unseen">--</strong> 件<br>
+      総作品: <strong id="stat-total">--</strong> 件 / 作者: <strong id="stat-authors">--</strong> 人
+    </span>
+    <button id="fetch-btn" onclick="triggerFetch()">今すぐ取得</button>
+  </div>
+
+</div>
+
+<script>
+  let currentWork = null;
+  let loading = false;
+
+  async function fetchNext(excludeAuthor = null) {
+    if (loading) return;
+    loading = true;
+    setButtonsEnabled(false);
+
+    const img = document.getElementById('work-img');
+    img.classList.add('skeleton');
+    img.src = '';
+
+    try {
+      const params = excludeAuthor ? `?exclude_author=${excludeAuthor}` : '';
+      const res = await fetch(`/api/next${params}`);
+
+      if (res.status === 404) {
+        showMessage(true);
+        loading = false;
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      showMessage(false);
+      const work = await res.json();
+      currentWork = work;
+      renderWork(work);
+    } catch (e) {
+      console.error(e);
+      document.getElementById('author-link').textContent = 'エラーが発生しました';
+      document.getElementById('date-text').textContent = e.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  function renderWork(work) {
+    const authorLink = document.getElementById('author-link');
+    authorLink.textContent = work.author_name;
+    authorLink.href = `https://www.pixiv.net/users/${work.author_id}`;
+
+    const date = work.created_at ? new Date(work.created_at) : null;
+    document.getElementById('date-text').textContent = date
+      ? `投稿日: ${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`
+      : '';
+
+    document.getElementById('work-title').textContent = work.title || '';
+
+    const workLink = document.getElementById('work-link');
+    workLink.href = work.page_url;
+
+    const img = document.getElementById('work-img');
+    img.style.minHeight = '200px';
+    const proxyUrl = `/api/image_proxy?url=${encodeURIComponent(work.image_url)}`;
+    img.onload = () => {
+      img.classList.remove('skeleton');
+      img.style.minHeight = '';
+      setButtonsEnabled(true);
+    };
+    img.onerror = () => {
+      img.classList.remove('skeleton');
+      img.style.minHeight = '';
+      setButtonsEnabled(true);
+    };
+    img.src = proxyUrl;
+  }
+
+  function setButtonsEnabled(enabled) {
+    document.getElementById('btn-skip').disabled = !enabled;
+    document.getElementById('btn-seen').disabled = !enabled;
+  }
+
+  async function onSeen() {
+    if (!currentWork) return;
+    const id = currentWork.id;
+    const authorId = currentWork.author_id;
+    currentWork = null;
+    await fetch(`/api/seen/${id}`, { method: 'POST' });
+    refreshStats();
+    fetchNext(authorId);
+  }
+
+  async function onSkip() {
+    if (!currentWork) return;
+    const id = currentWork.id;
+    const authorId = currentWork.author_id;
+    currentWork = null;
+    await fetch(`/api/skip/${id}`, { method: 'POST' });
+    fetchNext(authorId);
+  }
+
+  async function refreshStats() {
+    try {
+      const res = await fetch('/api/stats');
+      if (!res.ok) return;
+      const s = await res.json();
+      document.getElementById('stat-unseen').textContent = s.unseen.toLocaleString();
+      document.getElementById('stat-total').textContent = s.total.toLocaleString();
+      document.getElementById('stat-authors').textContent = s.authors.toLocaleString();
+    } catch {}
+  }
+
+  async function triggerFetch() {
+    const btn = document.getElementById('trigger-fetch-btn') || document.getElementById('fetch-btn');
+    const origText = btn.textContent;
+    btn.textContent = '実行中...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/fetch/trigger', { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json();
+        alert('エラー: ' + (d.detail || res.status));
+      } else {
+        alert('バッチを開始しました。数分後に作品が取得されます。');
+      }
+    } catch (e) {
+      alert('通信エラー: ' + e.message);
+    } finally {
+      btn.textContent = origText;
+      btn.disabled = false;
+    }
+  }
+
+  function showMessage(show) {
+    document.getElementById('message').classList.toggle('visible', show);
+    document.getElementById('image-wrap').style.display = show ? 'none' : '';
+    document.getElementById('header').style.display = show ? 'none' : '';
+  }
+
+  // Init
+  fetchNext();
+  refreshStats();
+</script>
+</body>
+</html>

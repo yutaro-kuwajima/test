@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pixivpy3
+apscheduler
+python-dotenv
+httpx
