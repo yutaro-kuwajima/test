@@ -24,9 +24,11 @@ def init_api(refresh_token: str) -> AppPixivAPI:
 
 # ---------- Following ----------
 
-def fetch_all_following(user_id: str = "0") -> list[dict]:
+def fetch_all_following(user_id: str | None = None) -> list[dict]:
     """Fetch all users the authenticated user follows."""
     api = get_api()
+    if user_id is None:
+        user_id = str(api.user_id)
     results = []
     next_url = None
 
